@@ -14,11 +14,16 @@ function generateTrackingId(userType) {
 
 /* ================= GET ALL GRIEVANCES ================= */
 router.get("/", async (req, res) => {
-  const data = await Grievance.find().sort({ createdAt: -1 });
-  res.json(data);
+  try {
+    const data = await Grievance.find().sort({ createdAt: -1 });
+    res.json(data);
+  } catch (err) {
+    console.error("Fetch grievances error:", err);
+    res.status(500).json({ message: "Failed to fetch grievances" });
+  }
 });
 
-/* ================= SUBMIT GRIEVANCE ================= */
+/* ================= SUBMIT GRIEVANCE (SAFE) ================= */
 router.post("/", async (req, res) => {
   try {
     const {
@@ -33,30 +38,41 @@ router.post("/", async (req, res) => {
       query,
     } = req.body;
 
+    /* BASIC VALIDATION */
     if (!userType || !name || !phone || !email || !department || !query) {
       return res.status(400).json({ message: "Required fields missing" });
     }
 
     const trackingId = generateTrackingId(userType);
 
-    const grievance = await Grievance.create({
+    /* BUILD PAYLOAD SAFELY */
+    const payload = {
       userType,
       trackingId,
-      category,
-      subject,
-      course,
       name,
       phone,
       email,
       department,
       query,
-    });
+    };
 
-    /* 📊 UPDATE STATS (SUBMITTED) */
+    /* STUDENT-ONLY FIELDS */
+    if (userType === "Student") {
+      payload.category = category;
+      payload.subject = subject;
+      payload.course = course;
+    }
+
+    const grievance = await Grievance.create(payload);
+
+    /* 📊 UPDATE STATS (ULTRA SAFE) */
     let stats = await GrievanceStats.findOne();
     if (!stats) {
       stats = await GrievanceStats.create({});
     }
+
+    stats.students.submitted ??= 0;
+    stats.teachers.submitted ??= 0;
 
     if (userType === "Student") {
       stats.students.submitted += 1;
@@ -81,6 +97,10 @@ router.put("/:id/resolve", async (req, res) => {
   try {
     const { reply } = req.body;
 
+    if (!reply) {
+      return res.status(400).json({ message: "Reply is required" });
+    }
+
     const updated = await Grievance.findByIdAndUpdate(
       req.params.id,
       {
@@ -91,11 +111,18 @@ router.put("/:id/resolve", async (req, res) => {
       { new: true }
     );
 
-    /* 📊 UPDATE STATS (RESOLVED) */
+    if (!updated) {
+      return res.status(404).json({ message: "Grievance not found" });
+    }
+
+    /* 📊 UPDATE STATS (RESOLVED SAFE) */
     let stats = await GrievanceStats.findOne();
     if (!stats) {
       stats = await GrievanceStats.create({});
     }
+
+    stats.students.resolved ??= 0;
+    stats.teachers.resolved ??= 0;
 
     if (updated.userType === "Student") {
       stats.students.resolved += 1;
@@ -114,24 +141,34 @@ router.put("/:id/resolve", async (req, res) => {
 
 /* ================= TRACK BY TRACKING ID ================= */
 router.get("/track/:trackingId", async (req, res) => {
-  const grievance = await Grievance.findOne({
-    trackingId: req.params.trackingId,
-  });
+  try {
+    const grievance = await Grievance.findOne({
+      trackingId: req.params.trackingId,
+    });
 
-  if (!grievance) {
-    return res.status(404).json({ message: "Invalid Tracking ID" });
+    if (!grievance) {
+      return res.status(404).json({ message: "Invalid Tracking ID" });
+    }
+
+    res.json(grievance);
+  } catch (err) {
+    console.error("Track grievance error:", err);
+    res.status(500).json({ message: "Failed to track grievance" });
   }
-
-  res.json(grievance);
 });
 
 /* ================= GRIEVANCE STATS ================= */
 router.get("/stats", async (req, res) => {
-  let stats = await GrievanceStats.findOne();
-  if (!stats) {
-    stats = await GrievanceStats.create({});
+  try {
+    let stats = await GrievanceStats.findOne();
+    if (!stats) {
+      stats = await GrievanceStats.create({});
+    }
+    res.json(stats);
+  } catch (err) {
+    console.error("Stats error:", err);
+    res.status(500).json({ message: "Failed to load stats" });
   }
-  res.json(stats);
 });
 
 export default router;

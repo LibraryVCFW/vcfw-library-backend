@@ -26,8 +26,15 @@ const grievanceSchema = new mongoose.Schema(
         "Staff Behaviour",
         "Other",
       ],
+      required: function () {
+        return this.userType === "Student";
+      },
     },
-    subject: String, // only if category = Other
+
+    subject: {
+      type: String,
+    },
+
     course: {
       type: String,
       enum: ["General", "Honours"],
