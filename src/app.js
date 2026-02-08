@@ -9,8 +9,24 @@ import adminRoutes from "./routes/admin.js";
 
 const app = express();
 
-/* MIDDLEWARE */
-app.use(cors());
+/* ================= CORS (FIXED FOR NETLIFY + RENDER) ================= */
+app.use(
+  cors({
+    origin: [
+      "https://vcfwlibrary.org",
+      "https://www.vcfwlibrary.org",
+      "http://localhost:5173"
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
+  })
+);
+
+/* HANDLE PREFLIGHT */
+app.options("*", cors());
+
+/* BODY PARSER */
 app.use(express.json());
 
 /* ROUTES */
@@ -20,5 +36,5 @@ app.use("/api/requisitions", requisitionRoutes);
 app.use("/api/resources", resourceRoutes);
 app.use("/api/admin", adminRoutes);
 
-/* DEFAULT EXPORT — THIS IS CRITICAL */
+/* EXPORT */
 export default app;
