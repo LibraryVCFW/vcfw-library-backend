@@ -8,9 +8,11 @@ const router = express.Router();
 function generateTrackingId(userType) {
   const prefix = userType === "Student" ? "LGR-STU" : "LGR-TEA";
   const year = new Date().getFullYear();
-  const random = Math.floor(1000 + Math.random() * 9000);
-  return `${prefix}-${year}-${random}`;
+  const timestamp = Date.now().toString().slice(-6); // last 6 digits
+  const random = Math.floor(100 + Math.random() * 900);
+  return `${prefix}-${year}-${timestamp}-${random}`;
 }
+
 
 /* ================= GET ALL GRIEVANCES ================= */
 router.get("/", async (req, res) => {
